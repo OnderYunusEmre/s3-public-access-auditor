@@ -77,18 +77,20 @@ def bucket_bilgilerini_al(s3, isim):
 
 
 def denetle():
-    """Hesaptaki tüm bucket'ları tarar, riskli olanları döndürür."""
+    """Hesaptaki tüm bucket'ları tarar. (toplam, riskliler) döndürür."""
     s3 = boto3.client("s3")
     riskliler = []
+    toplam = 0
 
     for bucket in s3.list_buckets()["Buckets"]:
+        toplam += 1
         isim = bucket["Name"]
         pab, policy_herkese_acik, grants = bucket_bilgilerini_al(s3, isim)
         riskler = bucket_riskleri(pab, policy_herkese_acik, grants)
         if riskler:
             riskliler.append({"bucket": isim, "riskler": riskler})
 
-    return riskliler
+    return toplam, riskliler
 
 
 def main():
@@ -97,7 +99,7 @@ def main():
     args = parser.parse_args()
 
     try:
-        riskliler = denetle()
+        toplam, riskliler = denetle()
     except NoCredentialsError:
         print("Hata: AWS kimlik bilgisi bulunamadı. 'aws configure' ile yapılandırın.")
         return
@@ -117,7 +119,9 @@ def main():
     with open(args.cikti, "w", encoding="utf-8") as f:
         json.dump(riskliler, f, ensure_ascii=False, indent=2)
 
-    print(f"{len(riskliler)} riskli bucket bulundu, '{args.cikti}' dosyasına yazıldı.")
+    guvenli = toplam - len(riskliler)
+    print(f"{toplam} bucket tarandı: {len(riskliler)} riskli, {guvenli} güvenli.")
+    print(f"Sonuçlar '{args.cikti}' dosyasına yazıldı.")
 
 
 if __name__ == "__main__":
